@@ -30,7 +30,7 @@ if ! emulator_running; then
     >> "$XTV_LOG_DIR/exp2-emulator.log" 2>&1 &
   adb_wait_boot 180 || die "el emulador no arrancó"
 fi
-pkg="$(detect_x_package)" || die "X no está instalado (emu/setup.sh)"
+pkg="$(detect_x_package)" || die "X no está instalado (emu/setup.sh --install-only)"
 x_to_foreground || true
 
 # ---------- Plan A: Auto-advance nativo ----------
@@ -67,8 +67,10 @@ SEEKBAR_NODES=0
 if [[ -s "$UIDUMP" ]]; then
   # uiautomator no exporta rangeInfo directamente, pero sí la clase SeekBar y
   # atributos de progreso: es el proxy observable del RangeInfo del a11y tree.
-  SEEKBAR_NODES=$(grep -o 'SeekBar' "$UIDUMP" | wc -l | tr -d ' ')
-  RANGEINFO_NODES=$(grep -oE 'ProgressBar|SeekBar|Slider' "$UIDUMP" | wc -l | tr -d ' ')
+  # || true: sin matches grep sale 1 y con pipefail+set -e mataría el script
+  # justo en el caso "sin barras de progreso" que debemos diagnosticar
+  SEEKBAR_NODES=$(grep -o 'SeekBar' "$UIDUMP" | wc -l | tr -d ' ') || true
+  RANGEINFO_NODES=$(grep -oE 'ProgressBar|SeekBar|Slider' "$UIDUMP" | wc -l | tr -d ' ') || true
   info "nodos tipo barra de progreso en el dump: $RANGEINFO_NODES (SeekBar: $SEEKBAR_NODES)"
 else
   warn "no pude obtener el uiautomator dump"

@@ -35,6 +35,9 @@ sed "s/@@VERSION@@/$VERSION/g" "$HERE/app-template/Info.plist" \
 cat > "$OUT/Contents/MacOS/xtv" <<EOF
 #!/usr/bin/env bash
 # Ejecutable de XTV.app — generado por make-app.sh; la lógica vive en launch.sh
+# Finder/LaunchServices arranca con PATH mínimo (sin Homebrew): reponerlo,
+# o scrcpy no se encontraría nunca en el camino real del doble clic.
+export PATH="/opt/homebrew/bin:/usr/local/bin:\$PATH"
 mkdir -p "\$HOME/.xtv/logs"
 exec "$LAUNCH_SH" >> "\$HOME/.xtv/logs/app.log" 2>&1
 EOF

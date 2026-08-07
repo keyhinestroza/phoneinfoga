@@ -36,8 +36,11 @@ Si ya tienes Android Studio, reutiliza tu SDK automáticamente
 1. Abre <https://www.apkmirror.com/apk/x-corp/twitter/>
 2. Última versión estable → variante **BUNDLE** con `arm64-v8a` (extensión
    `.apkm`).
-3. Descárgala; `setup.sh` te pedirá la ruta y la instalará con
-   `adb install-multiple`.
+3. Instálala sin comprometer aún el login (eso lo valida exp1):
+
+```bash
+emu/setup.sh --install-only    # te pide la ruta del .apkm y lo instala
+```
 
 ## 3. Experimento 1 — el gate del login
 

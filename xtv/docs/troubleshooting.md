@@ -58,10 +58,10 @@ Si usas varios AVDs cambia `XTV_ADB_SERIAL`.
 ## Actualizaciones de la app de X
 
 Sin Play Store activa la app no se auto-actualiza (bien: estabilidad). Para
-actualizar: baja el nuevo .apkm de APKMirror → `emu/setup.sh` (detectará la
-instalación y solo reinstala) → verifica Auto-advance (exp2) → regraba el
-snapshot. Si la nueva versión rompe algo, reinstala la anterior (APKMirror
-guarda el histórico).
+actualizar: baja el nuevo .apkm de APKMirror → `emu/setup.sh --reinstall`
+(fuerza la reinstalación; `install -r` preserva datos y sesión) → verifica
+Auto-advance (exp2) → regraba el snapshot (`--refresh-snapshot`). Si la nueva
+versión rompe algo, reinstala la anterior (APKMirror guarda el histórico).
 
 ## Webview (plan B)
 

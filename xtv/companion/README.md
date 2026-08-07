@@ -27,7 +27,8 @@ por invocación), timing preciso, callback de resultado y aleatorización — y
 ```bash
 cd companion
 # usa el JDK de brew (temurin) y el SDK de ~/.xtv/sdk
-ANDROID_HOME=~/.xtv/sdk ./gradlew assembleDebug   # requiere gradle wrapper o brew install gradle
+brew install gradle                # no hay wrapper commiteado
+ANDROID_HOME=~/.xtv/sdk gradle assembleDebug
 adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 

@@ -30,7 +30,7 @@ XTV_FULLSCREEN="${XTV_FULLSCREEN:-0}"
 # 'host' (audio del emulador al Mac, scrcpy --no-audio). exp3 decide.
 XTV_AUDIO="${XTV_AUDIO:-scrcpy}"
 
-# cmdline-tools (versión fijada; actualizar URL y hash juntos si se cambia)
+# cmdline-tools (versión fijada en la URL; el zip lo sirve dl.google.com por HTTPS)
 XTV_CMDLINE_TOOLS_URL="${XTV_CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip}"
 
 XTV_LOG_DIR="$XTV_HOME/logs"

@@ -32,6 +32,7 @@ cd xtv
 
 # ── vía emulada ──
 emu/bootstrap.sh                    # descarga SDK + emulador + imagen (~3-5 GB, una vez)
+emu/setup.sh --install-only         # instala el APK de X (sin comprometer el login aún)
 emu/experiments/exp1-login.sh       # GATE: ¿el login sobrevive en el emulador?
 emu/experiments/exp2-autoadvance.sh # ¿Auto-advance nativo disponible?
 emu/setup.sh                        # login + Auto-advance + snapshot "golden"

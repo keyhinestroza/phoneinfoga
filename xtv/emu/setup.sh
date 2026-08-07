@@ -10,6 +10,10 @@
 #
 # Uso:
 #   setup.sh                    setup completo
+#   setup.sh --install-only     solo arrancar emulador + instalar el APK
+#                               (para correr exp1 ANTES de comprometerse)
+#   setup.sh --reinstall        forzar reinstalación del APK (actualización
+#                               de la app; install -r preserva datos/sesión)
 #   setup.sh --refresh-snapshot solo regrabar el snapshot (tras actualizar X)
 set -euo pipefail
 
@@ -20,12 +24,28 @@ source "$HERE/env.sh"
 source "$HERE/lib.sh"
 
 REFRESH_ONLY=0
+INSTALL_ONLY=0
+REINSTALL=0
 for arg in "$@"; do
   case "$arg" in
     --refresh-snapshot) REFRESH_ONLY=1 ;;
+    --install-only) INSTALL_ONLY=1 ;;
+    --reinstall) REINSTALL=1 ;;
     *) die "argumento desconocido: $arg" ;;
   esac
 done
+
+# Trap ÚNICO de limpieza (los traps EXIT se pisan entre sí si se declaran por
+# sección): mata el grupo de procesos de la sonda de logcat y borra temporales.
+LOGCAT_PID=""
+TMP_DIR=""
+cleanup() {
+  if [[ -n "$LOGCAT_PID" ]]; then
+    kill -- -"$LOGCAT_PID" 2>/dev/null || kill "$LOGCAT_PID" 2>/dev/null || true
+  fi
+  [[ -n "$TMP_DIR" ]] && rm -rf "$TMP_DIR"
+}
+trap cleanup EXIT
 
 [[ -x "$XTV_EMULATOR" ]] || die "no hay emulador en $XTV_EMULATOR — corre primero emu/bootstrap.sh"
 mkdir -p "$XTV_LOG_DIR"
@@ -59,7 +79,7 @@ if [[ "$REFRESH_ONLY" == 1 ]]; then
 fi
 
 # ---------- instalación del APK ----------
-if pkg="$(detect_x_package)"; then
+if [[ "$REINSTALL" == 0 ]] && pkg="$(detect_x_package)"; then
   info "X ya instalado ($pkg)"
 else
   cat <<'EOF'
@@ -76,8 +96,7 @@ EOF
 
   case "$APK_PATH" in
     *.apkm|*.apks|*.zip)
-      TMP_DIR="$(mktemp -d)"
-      trap 'rm -rf "$TMP_DIR"' EXIT
+      TMP_DIR="$(mktemp -d)" # lo borra el trap cleanup
       info "extrayendo bundle"
       unzip -q -o "$APK_PATH" -d "$TMP_DIR"
       # base + splits relevantes para el AVD (arm64, xhdpi, es/en).
@@ -100,14 +119,24 @@ EOF
   pass "X instalado: $pkg"
 fi
 
+if [[ "$INSTALL_ONLY" == 1 ]]; then
+  pass "instalación completa. Siguiente: emu/experiments/exp1-login.sh (el gate del login)"
+  exit 0
+fi
+
 # ---------- login guiado con sonda de atestación ----------
 info "arrancando sonda de logcat (errores de atestación) en segundo plano"
 adb_ logcat -c || true
 LOGCAT_FILE="$XTV_LOG_DIR/login-logcat.log"
-( adb_ logcat | grep -iE 'Attestation|Integrity|LoginError|DroidGuard' \
+# --line-buffered: sin él grep bufferiza ~4KB hacia el archivo y el chequeo
+# posterior vería el log vacío aunque hubiera hits (falso "sonda limpia").
+# set -m: la sonda va en su propio grupo de procesos para poder matar el
+# pipeline completo (adb+grep), no solo el subshell.
+set -m
+( adb_ logcat | grep --line-buffered -iE 'Attestation|Integrity|LoginError|DroidGuard' \
     > "$LOGCAT_FILE" 2>/dev/null ) &
 LOGCAT_PID=$!
-trap 'kill "$LOGCAT_PID" 2>/dev/null || true' EXIT
+set +m
 
 x_to_foreground || true
 cat <<'EOF'
@@ -121,7 +150,9 @@ LOGIN (en la ventana del emulador):
 
 EOF
 read -r -p "pulsa Enter cuando hayas terminado el login... "
-kill "$LOGCAT_PID" 2>/dev/null || true
+kill -- -"$LOGCAT_PID" 2>/dev/null || kill "$LOGCAT_PID" 2>/dev/null || true
+LOGCAT_PID=""
+sleep 1 # dejar al pipeline volcar sus últimas líneas
 if [[ -s "$LOGCAT_FILE" ]]; then
   warn "la sonda capturó menciones de atestación (revisa $LOGCAT_FILE):"
   head -5 "$LOGCAT_FILE"

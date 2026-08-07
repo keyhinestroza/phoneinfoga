@@ -16,7 +16,13 @@
 (function () {
   'use strict';
   if (window.__xtv) {
-    return; // idempotente: la re-inyección tras navegación SPA no duplica
+    // idempotente: la re-inyección tras navegación SPA no duplica, pero sí
+    // re-ata el MutationObserver (React puede haber remontado el timeline y
+    // el nodo observado quedar desconectado)
+    if (window.__xtv._internals && window.__xtv._internals.reobserve) {
+      window.__xtv._internals.reobserve();
+    }
+    return;
   }
 
   var S = window.XTVSelectors;
@@ -113,7 +119,9 @@
       return 0;
     }
     var visible = Math.min(r.bottom, vh) - Math.max(r.top, 0);
-    return Math.max(0, visible) / r.height;
+    // normalizar contra el menor de (alto del elemento, viewport): un video
+    // más alto que el viewport también debe poder ser "activo"
+    return Math.max(0, visible) / Math.min(r.height, vh);
   }
 
   function activeVideo() {
@@ -195,8 +203,18 @@
       return;
     }
     state.advancing = true;
+    var fromId = state.currentId;
     var delay = reason === 'ad' ? 0 : C.jitter(cfg);
     setTimeout(function () {
+      if (state.paused) {
+        state.advancing = false;
+        return;
+      }
+      if (state.currentId !== fromId) {
+        // obsoleto: otro flujo ya cambió el video activo (y evaluate re-armó
+        // advancing); este timeout ya no representa nada
+        return;
+      }
       var target = C.pickNext(candidates(), state.currentId);
       if (!target) {
         // no hay siguiente cargado: delegar en x.com (j = siguiente post),
@@ -215,6 +233,9 @@
       // confirmar que el objetivo quedó activo; si no, fallback 'j'
       setTimeout(function () {
         state.advancing = false;
+        if (state.paused) {
+          return;
+        }
         evaluate();
         if (state.currentId !== target.id) {
           pressJ();
@@ -253,11 +274,27 @@
 
   var mo = new MutationObserver(scheduleEvaluate);
   function observe() {
+    // re-atable: tras una navegación SPA el nodo observado puede haber sido
+    // desmontado por React; disconnect + re-attach al timeline actual
+    mo.disconnect();
     var timeline = S.queryIn(document, 'timeline') || document.body;
     mo.observe(timeline, { childList: true, subtree: true });
+    scheduleEvaluate();
   }
 
   window.addEventListener('scroll', scheduleEvaluate, { passive: true });
+
+  // Watchdog: onProgress solo corre con eventos del video; un video estancado
+  // (sin timeupdate) jamás alcanzaría el escape maxVideoMs sin este tick.
+  setInterval(function () {
+    if (state.paused) {
+      return;
+    }
+    var v = activeVideo();
+    if (v) {
+      onProgress(v, false);
+    }
+  }, 10000);
 
   /* ---- API pública (preload / tests) ---- */
 
@@ -287,6 +324,7 @@
       candidates: candidates,
       advance: advance,
       pressJ: pressJ,
+      reobserve: observe,
     },
   };
 

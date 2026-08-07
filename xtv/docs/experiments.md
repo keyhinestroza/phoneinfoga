@@ -6,7 +6,9 @@ un Mac real. Cada experimento es un script interactivo que imprime
 `emu/experiments/results/` (pégalo en una sesión futura de Claude para
 continuar el trabajo con datos reales).
 
-Orden: **exp1 → exp2 → setup.sh → exp3**.
+Orden: **`setup.sh --install-only` → exp1 → exp2 → setup.sh → exp3**
+(el APK tiene que estar instalado antes de exp1; `--install-only` instala sin
+comprometer aún el login, que es justo lo que exp1 valida).
 
 ## exp1-login.sh — ¿el login sobrevive Play Integrity? (GATE)
 

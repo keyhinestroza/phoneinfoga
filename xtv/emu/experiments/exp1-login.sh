@@ -43,7 +43,7 @@ fi
 # ---------- X instalado ----------
 if ! pkg="$(detect_x_package)"; then
   warn "X no está instalado en el AVD."
-  echo "Instálalo primero con emu/setup.sh (pasos 'instalación del APK') y reintenta."
+  echo "Instálalo primero con: emu/setup.sh --install-only  y reintenta."
   exit 1
 fi
 info "package: $pkg"
@@ -51,10 +51,15 @@ info "package: $pkg"
 # ---------- sonda de logcat ----------
 adb_ logcat -c || true
 LOGCAT_FILE="$XTV_RESULTS_DIR/exp1-logcat.log"
-( adb_ logcat | grep -iE 'Attestation|Integrity|LoginError|DroidGuard|SafetyNet' \
+# --line-buffered: sin él grep bufferiza ~4KB y el conteo posterior daría un
+# falso "attestation_log_lines: 0" — la evidencia del experimento gate.
+# set -m: grupo de procesos propio para matar el pipeline completo (adb+grep).
+set -m
+( adb_ logcat | grep --line-buffered -iE 'Attestation|Integrity|LoginError|DroidGuard|SafetyNet' \
     > "$LOGCAT_FILE" 2>/dev/null ) &
 LOGCAT_PID=$!
-trap 'kill "$LOGCAT_PID" 2>/dev/null || true' EXIT
+set +m
+trap 'kill -- -"$LOGCAT_PID" 2>/dev/null || kill "$LOGCAT_PID" 2>/dev/null || true' EXIT
 
 x_to_foreground || true
 screenshot "exp1-before-login"
@@ -73,7 +78,8 @@ PROTOCOLO (en la ventana del emulador):
 
 EOF
 read -r -p "pulsa Enter cuando hayas terminado (con éxito o sin él)... "
-kill "$LOGCAT_PID" 2>/dev/null || true
+kill -- -"$LOGCAT_PID" 2>/dev/null || kill "$LOGCAT_PID" 2>/dev/null || true
+sleep 1 # dejar al pipeline volcar sus últimas líneas
 screenshot "exp1-after-login"
 
 # ---------- veredicto ----------
