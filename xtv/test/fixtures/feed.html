@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  feed.html — timeline simulado de x.com con la estructura data-testid REAL
+  (article[data-testid="tweet"], div[data-testid="videoPlayer"] video,
+  placementTracking para el promocionado). Sirve para validar la lógica de
+  auto-avance con el mismo motor (Chromium) y la misma vía de inyección que
+  usa la app. No replica el DOM completo de X: replica el contrato que
+  consume selectors.js.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>xtv fixture feed</title>
+  <style>
+    body { margin: 0; background: #111; color: #eee; font-family: sans-serif; }
+    article { min-height: 90vh; display: flex; flex-direction: column;
+              justify-content: center; align-items: center;
+              border-bottom: 1px solid #333; }
+    video { width: 240px; height: 400px; background: #000; }
+  </style>
+</head>
+<body>
+  <main role="main">
+    <div data-testid="primaryColumn">
+
+      <article data-testid="tweet">
+        <a href="/userA/status/1001">post 1001</a>
+        <div data-testid="videoPlayer">
+          <video src="assets/clip1.webm" muted autoplay loop playsinline></video>
+        </div>
+      </article>
+
+      <article data-testid="tweet">
+        <a href="/userB/status/1002">post 1002</a>
+        <div data-testid="videoPlayer">
+          <video src="assets/clip2.webm" muted loop playsinline></video>
+        </div>
+      </article>
+
+      <!-- Promocionado: debe saltarse sin reproducir -->
+      <article data-testid="tweet">
+        <a href="/adUser/status/1003">post 1003 (ad)</a>
+        <div data-testid="placementTracking">
+          <div data-testid="videoPlayer">
+            <video src="assets/clip3.webm" muted loop playsinline></video>
+          </div>
+        </div>
+      </article>
+
+      <article data-testid="tweet">
+        <a href="/userC/status/1004">post 1004</a>
+        <div data-testid="videoPlayer">
+          <video src="assets/clip4.webm" muted loop playsinline></video>
+        </div>
+      </article>
+
+    </div>
+  </main>
+</body>
+</html>
