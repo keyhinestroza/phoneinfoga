@@ -44,13 +44,19 @@
       box.textContent = 'xtv: motor de autoplay no cargado';
       return;
     }
+    var cid = st.currentId || '—';
+    if (cid.length > 18) {
+      cid = '…' + cid.slice(-16);
+    }
     box.textContent =
       'XTV diag  (tecla d oculta)\n' +
       'posts en DOM : ' + st.articles + '\n' +
       'videos en DOM: ' + st.videos + '\n' +
+      'posts c/video: ' + (st.videoPosts != null ? st.videoPosts : '?') + '\n' +
+      'en pantalla  : ' + (st.postsEnPantalla != null ? st.postsEnPantalla : '?') + '\n' +
       'video activo : ' + (st.activeVideo ? 'sí' : 'no') +
-      (st.activeVideo ? (st.activePlaying ? ' (reproduciendo)' : ' (pausado)') : '') + '\n' +
-      'currentId    : ' + (st.currentId || '—') + '\n' +
+      (st.activeVideo ? (st.activePlaying ? ' (reprod.)' : ' (pausado)') : '') + '\n' +
+      'currentId    : ' + cid + '\n' +
       'cazando      : ' + (st.hunting ? 'sí #' + st.huntCount : 'no') + '\n' +
       'pausado      : ' + (st.paused ? 'sí' : 'no') + '\n' +
       'última acción: ' + st.lastAction;

@@ -82,17 +82,6 @@
     return null;
   }
 
-  function articleOf(video) {
-    var el = video;
-    while (el && el !== document.body) {
-      if (el.tagName === 'ARTICLE') {
-        return el;
-      }
-      el = el.parentElement;
-    }
-    return null;
-  }
-
   /* ---- adopción de videos ---- */
 
   var adopted = new WeakSet();
@@ -123,18 +112,47 @@
    * hasta que se reproduce, así que medir su visibilidad no sirve. En su
    * lugar elegimos el ARTICLE (post) con video más centrado en el viewport. */
 
-  function articlesWithVideo() {
-    return articles().filter(function (a) {
-      return S.queryIn(a, 'video') !== null;
-    });
+  // El "post" contenedor de un <video>: el article si existe, o el mejor
+  // contenedor disponible. Parte del <video> (que sí existe en el DOM) y sube,
+  // sin depender de que el post tenga data-testid="tweet".
+  function postOf(video) {
+    if (video.closest) {
+      var p =
+        video.closest('article') ||
+        video.closest('[data-testid="cellInnerDiv"]') ||
+        video.closest('[data-testid="tweet"]');
+      if (p) {
+        return p;
+      }
+    }
+    // fallback: subir hasta un ancestro con altura significativa
+    var el = video.parentElement;
+    while (el && el !== document.body) {
+      if (el.getBoundingClientRect().height > 80) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return video.parentElement || video;
+  }
+
+  // Unidades reproducibles: cada <video> del DOM con su post contenedor.
+  function videoUnits() {
+    return S.queryAll(document, 'video')
+      .map(function (v) {
+        return { video: v, post: postOf(v) };
+      })
+      .filter(function (u) {
+        return u.post;
+      });
   }
 
   function centeredArticle() {
     var vh = window.innerHeight || document.documentElement.clientHeight;
     var best = null;
     var bestDist = Infinity;
-    articlesWithVideo().forEach(function (a) {
-      var r = a.getBoundingClientRect();
+    videoUnits().forEach(function (u) {
+      var r = u.post.getBoundingClientRect();
       if (r.bottom <= 0 || r.top >= vh || r.height === 0) {
         return; // fuera del viewport
       }
@@ -142,7 +160,7 @@
       var dist = Math.abs(center - vh / 2);
       if (dist < bestDist) {
         bestDist = dist;
-        best = { article: a, dist: dist, vh: vh };
+        best = { article: u.post, video: u.video, dist: dist, vh: vh };
       }
     });
     return best;
@@ -151,7 +169,7 @@
   // Compatibilidad con onProgress/watchdog: el <video> del post centrado.
   function activeVideo() {
     var c = centeredArticle();
-    return c ? S.queryIn(c.article, 'video') : null;
+    return c ? c.video : null;
   }
 
   function playOnly(video) {
@@ -208,18 +226,18 @@
       advance('ad'); // promocionado: no se reproduce, se salta
       return;
     }
-    var id = S.statusIdOf(article);
+    var video = c.video;
+    var id = idOfVideo(video);
     // si el post no está bien centrado, centrarlo UNA vez y dejar asentar; a
     // la segunda pasada (o si no se puede centrar más) se reproduce igual
     if (c.dist > c.vh * 0.3 && id && state.centeredId !== id) {
       state.centeredId = id;
-      article.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (article.scrollIntoView
+        ? article
+        : video
+      ).scrollIntoView({ behavior: 'smooth', block: 'center' });
       state.lastAction = 'centrando post';
       setTimeout(scheduleEvaluate, 500);
-      return;
-    }
-    var video = S.queryIn(article, 'video');
-    if (!video) {
       return;
     }
     adopt(video);
@@ -227,7 +245,7 @@
       state.currentId = id;
       state.startedAt = Date.now();
       state.advancing = false;
-      state.lastAction = 'play ' + id;
+      state.lastAction = 'play ' + (id.length > 16 ? id.slice(-12) : id);
     }
     playOnly(video);
   }
@@ -253,12 +271,17 @@
 
   /* ---- decisión y avance ---- */
 
+  // Identidad unificada de un video (status-id del post o su src).
+  function idOfVideo(video) {
+    var a = video.closest ? video.closest('article') : null;
+    return (a && S.statusIdOf(a)) || video.currentSrc || video.src || null;
+  }
+
   function onProgress(video, endedFired) {
     if (state.paused || state.advancing) {
       return;
     }
-    var article = articleOf(video);
-    if (!article || S.statusIdOf(article) !== state.currentId) {
+    if (idOfVideo(video) !== state.currentId) {
       return; // evento de un video que ya no es el activo
     }
     var decision = C.shouldAdvance(
@@ -406,6 +429,15 @@
     status: function () {
       var arts = articles();
       var vids = S.queryAll(document, 'video');
+      var units = videoUnits();
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      var inView = 0;
+      units.forEach(function (u) {
+        var r = u.post.getBoundingClientRect();
+        if (r.bottom > 0 && r.top < vh && r.height !== 0) {
+          inView++;
+        }
+      });
       var active = activeVideo();
       return {
         paused: state.paused,
@@ -416,6 +448,8 @@
         lastAction: state.lastAction,
         articles: arts.length,
         videos: vids.length,
+        videoPosts: units.length,
+        postsEnPantalla: inView,
         activeVideo: !!active,
         activePlaying: active ? !active.paused : false,
       };
