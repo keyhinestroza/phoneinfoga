@@ -25,7 +25,7 @@ export default [
     },
   },
   {
-    files: ['webview/main.js', 'webview/preload.js'],
+    files: ['webview/main.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',
@@ -37,6 +37,21 @@ export default [
         console: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+      },
+    },
+  },
+  {
+    // preload corre en el renderer (mundo aislado): globals de navegador
+    files: ['webview/preload.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: {
+        document: 'readonly',
+        navigator: 'readonly',
+        window: 'readonly',
+        Promise: 'readonly',
+        DOMException: 'readonly',
       },
     },
   },

@@ -68,12 +68,22 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Neutraliza WebAuthn antes del JS de x.com para que el login por
+      // passkey (que se cuelga en Electron) nunca se dispare.
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
   win.setMenuBarVisibility(false);
 
   const wc = win.webContents;
   wc.setUserAgent(CHROME_UA);
+
+  // En modo diagnóstico, reenviar la consola del renderer al stdout.
+  if (process.env.XTV_SHOT) {
+    wc.on('console-message', (_e, _level, message) => {
+      console.log('[renderer]', message);
+    });
+  }
 
   // CSS solo en cargas completas (insertCSS ACUMULA hojas si se repite; en
   // navegación SPA el documento persiste y la hoja sigue aplicada). El JS sí
