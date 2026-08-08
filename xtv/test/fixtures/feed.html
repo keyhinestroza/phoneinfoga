@@ -16,6 +16,9 @@
     article { min-height: 90vh; display: flex; flex-direction: column;
               justify-content: center; align-items: center;
               border-bottom: 1px solid #333; }
+    /* El contenedor del reproductor tiene altura propia (como el póster real
+       de x.com), independiente del <video> que puede colapsar a 0px. */
+    [data-testid="videoPlayer"] { width: 240px; height: 400px; background: #111; }
     video { width: 240px; height: 400px; background: #000; }
   </style>
 </head>

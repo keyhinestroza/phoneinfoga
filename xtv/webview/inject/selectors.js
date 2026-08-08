@@ -22,6 +22,14 @@
       '[data-testid="videoComponent"] video',
       'video',
     ],
+    // Contenedor del reproductor: EXISTE con el póster antes de que haya un
+    // <video> (en el feed los videos son póster + botón de play hasta que se
+    // reproducen). Tiene altura real, a diferencia del <video> colapsado.
+    player: [
+      'div[data-testid="videoPlayer"]',
+      '[data-testid="videoComponent"]',
+      'div[data-testid="previewInterstitial"]',
+    ],
     ad: ['[data-testid="placementTracking"]'],
     statusLink: ['a[href*="/status/"]'],
     timeline: ['[data-testid="primaryColumn"]', 'main', 'body'],
