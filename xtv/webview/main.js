@@ -24,7 +24,9 @@ const path = require('path');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const PARTITION = 'persist:x';
-const START_URL = 'https://x.com/home';
+// XTV_START_URL: override de desarrollo (p. ej. el fixture de test) para
+// probar la inyección sin depender de x.com ni de una sesión.
+const START_URL = process.env.XTV_START_URL || 'https://x.com/home';
 
 // UA de Chrome estable (sin token Electron). Actualizar el número mayor de
 // vez en cuando junto con la versión de Electron.
@@ -88,8 +90,34 @@ function createWindow() {
   });
 }
 
+// Modo diagnóstico sin pantalla: XTV_SHOT=/ruta/prefijo hace capturas de la
+// ventana a los 6, 12 y 20 s y sale. Útil para smoke-tests en entornos
+// headless (xvfb) donde no se puede mirar la ventana.
+function armShotMode(w) {
+  const prefix = process.env.XTV_SHOT;
+  if (!prefix) {
+    return;
+  }
+  const delays = [6000, 12000, 20000];
+  delays.forEach((ms, i) => {
+    setTimeout(() => {
+      w.webContents
+        .capturePage()
+        .then((img) => {
+          fs.writeFileSync(`${prefix}-${i + 1}.png`, img.toPNG());
+          console.log(`[xtv] captura ${i + 1} guardada`);
+          if (i === delays.length - 1) {
+            app.quit();
+          }
+        })
+        .catch((err) => console.error('[xtv] captura falló:', err.message));
+    }, ms);
+  });
+}
+
 app.whenReady().then(() => {
   createWindow();
+  armShotMode(win);
 
   // Cmd+Shift+Space: pausar/reanudar el auto-avance y el video actual.
   globalShortcut.register('CommandOrControl+Shift+Space', () => {
