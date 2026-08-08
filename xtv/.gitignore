@@ -1,0 +1,11 @@
+node_modules/
+dist/
+logs/
+*.log
+emu/experiments/results/*
+!emu/experiments/results/.gitkeep
+*.apk
+*.apkm
+*.apks
+XTV.app/
+.DS_Store

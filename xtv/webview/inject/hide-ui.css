@@ -1,0 +1,49 @@
+/*
+ * hide-ui.css — oculta el chrome de x.com para dejar el timeline protagonista.
+ * Conservador: cada regla es independiente; si un selector deja de matchear,
+ * no rompe nada (la UI extra simplemente reaparece).
+ * Los selectores de x.com viven conceptualmente junto a selectors.js:
+ * si se actualiza uno, revisar el otro.
+ */
+
+/* Columna de navegación izquierda */
+header[role="banner"] {
+  display: none !important;
+}
+
+/* Columna derecha: tendencias, a quién seguir, cajas de búsqueda */
+[data-testid="sidebarColumn"] {
+  display: none !important;
+}
+
+/* Tweets promocionados (el JS también los salta; esto los quita de la vista) */
+article:has([data-testid="placementTracking"]) {
+  display: none !important;
+}
+
+/* Banners inferiores (aviso de cookies, "abrir en app", bottom bar) */
+[data-testid="BottomBar"] {
+  display: none !important;
+}
+
+/* Timeline a todo el ancho */
+[data-testid="primaryColumn"] {
+  max-width: 100% !important;
+  width: 100% !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+
+main[role="main"] {
+  align-items: stretch !important;
+}
+
+/* Cabecera sticky del timeline (tabs Para ti / Siguiendo): compacta, no fija */
+[data-testid="primaryColumn"] > div > div:first-child {
+  position: static !important;
+}
+
+/* Fondo oscuro uniforme para modo sala de cine */
+body {
+  background: #000 !important;
+}

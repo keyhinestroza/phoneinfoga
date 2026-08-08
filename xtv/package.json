@@ -1,0 +1,21 @@
+{
+  "name": "xtv",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Visor lean-back de videos de X/Twitter para macOS: vía emulada (Android) como camino principal y app Electron como plan B",
+  "main": "webview/main.js",
+  "scripts": {
+    "start": "electron .",
+    "fixtures": "node test/fixtures/gen-clips.mjs",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test \"test/unit/*.test.mjs\"",
+    "test:e2e": "node --test test/e2e/autoplay.spec.mjs",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "electron": "^38.2.0",
+    "eslint": "^9.39.0",
+    "playwright-core": "^1.56.0"
+  }
+}
