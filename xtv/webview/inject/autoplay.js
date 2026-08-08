@@ -166,6 +166,29 @@
     return best;
   }
 
+  // La unidad video+post más cercana al centro del viewport, ESTÉ o no dentro
+  // de él. Sirve para acercar el siguiente video con scrollIntoView (que
+  // scrollea el contenedor correcto, aunque x.com use un scroller interno y no
+  // la ventana).
+  function nearestUnit() {
+    var vh = window.innerHeight || document.documentElement.clientHeight;
+    var best = null;
+    var bestDist = Infinity;
+    videoUnits().forEach(function (u) {
+      var r = u.post.getBoundingClientRect();
+      if (r.height === 0) {
+        return;
+      }
+      var center = (r.top + r.bottom) / 2;
+      var dist = Math.abs(center - vh / 2);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = { article: u.post, video: u.video, dist: dist, vh: vh };
+      }
+    });
+    return best;
+  }
+
   // Compatibilidad con onProgress/watchdog: el <video> del post centrado.
   function activeVideo() {
     var c = centeredArticle();
@@ -214,8 +237,25 @@
     sweep();
     var c = centeredArticle();
     if (!c) {
-      // ningún post con video en el viewport: bajar hasta encontrar uno
-      huntForVideo();
+      // Ningún video-post DENTRO del viewport. Si hay videos en el DOM pero
+      // fuera de vista (x.com scrollea en un contenedor interno, no la
+      // ventana), acercar el más cercano con scrollIntoView, que scrollea el
+      // contenedor correcto. Solo si no hay ninguno, bajar a ciegas para
+      // cargar más contenido.
+      var near = nearestUnit();
+      if (near && near.article.scrollIntoView) {
+        if (state.huntCount >= MAX_HUNT) {
+          state.lastAction = 'no pude centrar tras ' + MAX_HUNT;
+          return; // el tick de 3s re-arma y reintenta
+        }
+        state.hunting = true;
+        state.huntCount++;
+        state.lastAction = 'acercando video (' + state.huntCount + ')';
+        near.article.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(scheduleEvaluate, 500);
+      } else {
+        huntForVideo();
+      }
       return;
     }
     // encontrado: fin del modo caza
@@ -439,6 +479,11 @@
         }
       });
       var active = activeVideo();
+      var geo = '';
+      if (units.length) {
+        var r0 = units[0].post.getBoundingClientRect();
+        geo = 'top' + Math.round(r0.top) + ' h' + Math.round(r0.height) + ' vh' + vh;
+      }
       return {
         paused: state.paused,
         currentId: state.currentId,
@@ -450,6 +495,7 @@
         videos: vids.length,
         videoPosts: units.length,
         postsEnPantalla: inView,
+        geo: geo,
         activeVideo: !!active,
         activePlaying: active ? !active.paused : false,
       };

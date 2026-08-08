@@ -54,6 +54,7 @@
       'videos en DOM: ' + st.videos + '\n' +
       'posts c/video: ' + (st.videoPosts != null ? st.videoPosts : '?') + '\n' +
       'en pantalla  : ' + (st.postsEnPantalla != null ? st.postsEnPantalla : '?') + '\n' +
+      'geo 1er post : ' + (st.geo || '—') + '\n' +
       'video activo : ' + (st.activeVideo ? 'sí' : 'no') +
       (st.activeVideo ? (st.activePlaying ? ' (reprod.)' : ' (pausado)') : '') + '\n' +
       'currentId    : ' + cid + '\n' +
