@@ -42,6 +42,44 @@ function readInject(name) {
 
 let win = null;
 
+// Override de WebAuthn/passkey. X consulta isUVPAA() y, si cree que hay un
+// autenticador de plataforma, dispara navigator.credentials.get(); dentro de
+// Electron eso arranca la búsqueda FIDO por Bluetooth/dispositivo cercano que
+// nunca resuelve y la pantalla "Clave de paso" se queda colgada. Declaramos
+// que no hay passkey y hacemos que get()/create() rechacen de inmediato, así
+// X ofrece contraseña/código. Se inyecta vía el debugger
+// (Page.addScriptToEvaluateOnNewDocument) en vez de un <script>: corre en el
+// mundo principal, antes que el código de la página, y la CSP de x.com —que
+// bloquea los scripts inline— no puede impedirlo.
+const WEBAUTHN_OVERRIDE = `(function () {
+  try {
+    if (navigator.credentials) {
+      var reject = function () {
+        return Promise.reject(new DOMException('WebAuthn deshabilitado en xtv', 'NotAllowedError'));
+      };
+      navigator.credentials.get = reject;
+      navigator.credentials.create = reject;
+    }
+    if (window.PublicKeyCredential) {
+      window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = function () {
+        return Promise.resolve(false);
+      };
+      window.PublicKeyCredential.isConditionalMediationAvailable = function () {
+        return Promise.resolve(false);
+      };
+    }
+  } catch (e) { /* no romper la página */ }
+})();`;
+
+// Se inyecta vía executeJavaScript (NO un <script> inline): executeJavaScript
+// corre inyectado por el proceso de navegador, exento de la CSP de x.com que
+// bloquea los scripts inline. La pantalla de passkey aparece tras varios
+// pasos de login, así que aplicarlo en dom-ready y en cada navegación llega
+// de sobra antes de que X llame a credentials.get().
+function injectWebAuthnOverride(wc) {
+  wc.executeJavaScript(WEBAUTHN_OVERRIDE).catch(() => {});
+}
+
 function injectJS(contents) {
   const js = [
     readInject('selectors.js'),
@@ -68,9 +106,6 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // Neutraliza WebAuthn antes del JS de x.com para que el login por
-      // passkey (que se cuelga en Electron) nunca se dispare.
-      preload: path.join(__dirname, 'preload.js'),
     },
   });
   win.setMenuBarVisibility(false);
@@ -85,14 +120,24 @@ function createWindow() {
     });
   }
 
+  // El override de passkey se aplica lo antes posible (dom-ready) y se re-aplica
+  // en cada navegación, porque cada documento nuevo restablece navigator.
+  wc.on('dom-ready', () => injectWebAuthnOverride(wc));
+  wc.on('did-start-navigation', () => injectWebAuthnOverride(wc));
+  wc.on('did-navigate', () => injectWebAuthnOverride(wc));
+
   // CSS solo en cargas completas (insertCSS ACUMULA hojas si se repite; en
   // navegación SPA el documento persiste y la hoja sigue aplicada). El JS sí
   // se re-inyecta en cada navegación: es idempotente (guard + reobserve).
   wc.on('did-finish-load', () => {
+    injectWebAuthnOverride(wc);
     wc.insertCSS(readInject('hide-ui.css')).catch(() => {});
     injectJS(wc);
   });
-  wc.on('did-navigate-in-page', () => injectJS(wc));
+  wc.on('did-navigate-in-page', () => {
+    injectWebAuthnOverride(wc);
+    injectJS(wc);
+  });
 
   win.loadURL(START_URL);
   win.on('closed', () => {

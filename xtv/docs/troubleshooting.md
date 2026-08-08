@@ -21,12 +21,15 @@ exitoso (`emu/setup.sh --refresh-snapshot`).
 
 **El login se queda colgado en "Clave de paso" / passkey (spinner infinito)**
 X empuja el login por passkey (WebAuthn) cuando cree que hay un autenticador
-de plataforma, y ese flujo no responde dentro de Electron. La app lo
-neutraliza automáticamente (`webview/preload.js`: declara que no hay passkey
-e intercepta `navigator.credentials`), de modo que X ofrece contraseña o
-código por email/SMS directamente. Si aun así lo ves colgado, pulsa "Usar
-otro método" e inicia sesión con contraseña; asegúrate de tener la última
-versión de la rama (el preload debe estar presente).
+de plataforma, y ese flujo no responde dentro de Electron (verás en la
+terminal errores tipo `FIDO: Cannot use Bluetooth...`). La app lo neutraliza
+automáticamente en `webview/main.js`: inyecta vía `executeJavaScript` (exento
+de la CSP de x.com, a diferencia de un `<script>` inline) un override que
+declara que no hay passkey e intercepta `navigator.credentials`, de modo que
+X ofrece contraseña o código por email/SMS. Se re-aplica en cada navegación,
+así que llega antes de la pantalla de passkey. Si aun así lo ves colgado,
+pulsa "Usar otro método"; y asegúrate de tener la última versión de la rama
+(`git pull`).
 
 **El primer login pide captcha/verificación por email**
 Normal ("unusual login": dispositivo nuevo). Resuélvelo a mano dentro de la
