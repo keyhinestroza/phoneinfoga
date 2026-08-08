@@ -40,13 +40,12 @@ function readInject(name) {
 
 let win = null;
 
-function inject(contents) {
+function injectJS(contents) {
   const js = [
     readInject('selectors.js'),
     readInject('core.js'),
     readInject('autoplay.js'),
   ].join('\n;\n');
-  contents.insertCSS(readInject('hide-ui.css')).catch(() => {});
   contents.executeJavaScript(js).catch((err) => {
     console.error('[xtv] fallo inyectando scripts:', err.message);
   });
@@ -74,9 +73,14 @@ function createWindow() {
   const wc = win.webContents;
   wc.setUserAgent(CHROME_UA);
 
-  // Inyección en cada carga completa y en cada navegación SPA.
-  wc.on('did-finish-load', () => inject(wc));
-  wc.on('did-navigate-in-page', () => inject(wc));
+  // CSS solo en cargas completas (insertCSS ACUMULA hojas si se repite; en
+  // navegación SPA el documento persiste y la hoja sigue aplicada). El JS sí
+  // se re-inyecta en cada navegación: es idempotente (guard + reobserve).
+  wc.on('did-finish-load', () => {
+    wc.insertCSS(readInject('hide-ui.css')).catch(() => {});
+    injectJS(wc);
+  });
+  wc.on('did-navigate-in-page', () => injectJS(wc));
 
   win.loadURL(START_URL);
   win.on('closed', () => {
@@ -106,15 +110,26 @@ app.whenReady().then(() => {
   });
 });
 
+// Persistir cookies de forma explícita antes de salir. Con guard de
+// reentrada y timeout de seguridad: la primera pasada intercepta el cierre y
+// hace el flush; la segunda (via app.quit()) sigue el flujo normal, de modo
+// que will-quit y el resto de handlers se ejecutan.
+let cookiesFlushed = false;
 app.on('before-quit', (event) => {
-  // Persistir cookies de forma explícita antes de salir.
-  const ses = session.fromPartition(PARTITION);
+  if (cookiesFlushed) {
+    return;
+  }
   event.preventDefault();
+  cookiesFlushed = true;
+  const ses = session.fromPartition(PARTITION);
+  const quit = () => app.quit();
+  const safety = setTimeout(quit, 2000);
   ses.cookies
     .flushStore()
     .catch(() => {})
     .finally(() => {
-      app.exit(0);
+      clearTimeout(safety);
+      quit();
     });
 });
 

@@ -35,6 +35,8 @@ export default [
         process: 'readonly',
         __dirname: 'readonly',
         console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
       },
     },
   },
