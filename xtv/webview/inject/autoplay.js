@@ -44,6 +44,7 @@
     advancing: false,
     hunting: false,
     huntCount: 0,
+    centeredId: null,
     lastAction: 'init',
   };
 
@@ -117,32 +118,75 @@
     S.queryAll(document, 'video').forEach(adopt);
   }
 
-  /* ---- video activo (por geometría, robusto ante desmontajes) ---- */
+  /* ---- video activo (por el POST centrado, no por el tamaño del <video>) ----
+   * En el feed de x.com el elemento <video> suele tener altura casi nula
+   * hasta que se reproduce, así que medir su visibilidad no sirve. En su
+   * lugar elegimos el ARTICLE (post) con video más centrado en el viewport. */
 
-  function visibleRatio(el) {
-    var r = el.getBoundingClientRect();
-    var vh = window.innerHeight || document.documentElement.clientHeight;
-    if (r.height === 0) {
-      return 0;
-    }
-    var visible = Math.min(r.bottom, vh) - Math.max(r.top, 0);
-    // normalizar contra el menor de (alto del elemento, viewport): un video
-    // más alto que el viewport también debe poder ser "activo"
-    return Math.max(0, visible) / Math.min(r.height, vh);
+  function articlesWithVideo() {
+    return articles().filter(function (a) {
+      return S.queryIn(a, 'video') !== null;
+    });
   }
 
-  function activeVideo() {
-    var vids = S.queryAll(document, 'video');
+  function centeredArticle() {
+    var vh = window.innerHeight || document.documentElement.clientHeight;
     var best = null;
-    var bestRatio = 0.4; // umbral: menos de 40% visible no cuenta como activo
+    var bestDist = Infinity;
+    articlesWithVideo().forEach(function (a) {
+      var r = a.getBoundingClientRect();
+      if (r.bottom <= 0 || r.top >= vh || r.height === 0) {
+        return; // fuera del viewport
+      }
+      var center = (r.top + r.bottom) / 2;
+      var dist = Math.abs(center - vh / 2);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = { article: a, dist: dist, vh: vh };
+      }
+    });
+    return best;
+  }
+
+  // Compatibilidad con onProgress/watchdog: el <video> del post centrado.
+  function activeVideo() {
+    var c = centeredArticle();
+    return c ? S.queryIn(c.article, 'video') : null;
+  }
+
+  function playOnly(video) {
+    var vids = S.queryAll(document, 'video');
     for (var i = 0; i < vids.length; i++) {
-      var ratio = visibleRatio(vids[i]);
-      if (ratio > bestRatio) {
-        best = vids[i];
-        bestRatio = ratio;
+      if (vids[i] === video) {
+        video.loop = false;
+        if (video.paused) {
+          video.play().catch(function () {});
+        }
+      } else if (!vids[i].paused) {
+        vids[i].pause();
       }
     }
-    return best;
+    // Fallback: si x.com no arranca la reproducción sola, un clic sobre el
+    // reproductor dispara su player.
+    setTimeout(function () {
+      if (state.paused || !video.paused) {
+        return;
+      }
+      state.lastAction = 'click para reproducir';
+      var target = video;
+      if (video.closest) {
+        target =
+          video.closest('[data-testid="videoPlayer"]') ||
+          video.closest('[data-testid="videoComponent"]') ||
+          video;
+      }
+      try {
+        target.click();
+      } catch (e) {
+        void e;
+      }
+      video.play().catch(function () {});
+    }, 500);
   }
 
   function evaluate() {
@@ -150,43 +194,42 @@
       return;
     }
     sweep();
-    var video = activeVideo();
-    if (!video) {
-      // El feed "Para ti" es mayormente texto/fotos: si no hay video visible,
-      // bajar hasta encontrar uno (convierte el timeline mixto en un feed de
-      // video). Con tope para no scrollear al infinito.
+    var c = centeredArticle();
+    if (!c) {
+      // ningún post con video en el viewport: bajar hasta encontrar uno
       huntForVideo();
       return;
     }
     // encontrado: fin del modo caza
     state.hunting = false;
     state.huntCount = 0;
-    var article = articleOf(video);
-    if (!article) {
-      return;
-    }
+    var article = c.article;
     if (S.isAd(article)) {
       advance('ad'); // promocionado: no se reproduce, se salta
       return;
     }
     var id = S.statusIdOf(article);
+    // si el post no está bien centrado, centrarlo UNA vez y dejar asentar; a
+    // la segunda pasada (o si no se puede centrar más) se reproduce igual
+    if (c.dist > c.vh * 0.3 && id && state.centeredId !== id) {
+      state.centeredId = id;
+      article.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      state.lastAction = 'centrando post';
+      setTimeout(scheduleEvaluate, 500);
+      return;
+    }
+    var video = S.queryIn(article, 'video');
+    if (!video) {
+      return;
+    }
+    adopt(video);
     if (id && id !== state.currentId) {
       state.currentId = id;
       state.startedAt = Date.now();
       state.advancing = false;
       state.lastAction = 'play ' + id;
     }
-    // reproducir el activo, pausar el resto
-    var vids = S.queryAll(document, 'video');
-    for (var i = 0; i < vids.length; i++) {
-      if (vids[i] === video) {
-        if (vids[i].paused) {
-          vids[i].play().catch(function () {});
-        }
-      } else if (!vids[i].paused) {
-        vids[i].pause();
-      }
-    }
+    playOnly(video);
   }
 
   // Baja ~85% del viewport buscando el siguiente video; reprograma evaluate.

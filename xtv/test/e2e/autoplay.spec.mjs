@@ -154,3 +154,22 @@ test('loop re-forzado hostil: avanza igualmente por la vía near-end', async () 
   await waitForCurrentId(page, '1002');
   await page.close();
 });
+
+test('video de altura casi nula (como el feed real de x.com) igual se reproduce', async () => {
+  // Reproduce el bug real: en x.com el <video> del feed mide ~0px hasta que
+  // se reproduce; la detección debe basarse en el POST, no en el <video>.
+  const page = await openFeed({
+    preInject: () => {
+      // achicar todos los <video> a 0px de alto, dejando el post con su altura
+      const style = document.createElement('style');
+      style.textContent = 'video { height: 0 !important; }';
+      document.documentElement.appendChild(style);
+    },
+  });
+  // pese a que cada <video> mide 0px, debe centrar el post y reproducir
+  await waitForCurrentId(page, '1001', 8000);
+  const st = await page.evaluate(() => window.__xtv.status());
+  assert.equal(st.currentId, '1001');
+  assert.ok(st.videos >= 1, 'debe contar los <video> del DOM');
+  await page.close();
+});
