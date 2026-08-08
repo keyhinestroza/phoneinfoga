@@ -81,11 +81,11 @@ function injectWebAuthnOverride(wc) {
 }
 
 function injectJS(contents) {
-  const js = [
-    readInject('selectors.js'),
-    readInject('core.js'),
-    readInject('autoplay.js'),
-  ].join('\n;\n');
+  const files = ['selectors.js', 'core.js', 'autoplay.js'];
+  if (process.env.XTV_DIAG) {
+    files.push('diag.js');
+  }
+  const js = files.map(readInject).join('\n;\n');
   contents.executeJavaScript(js).catch((err) => {
     console.error('[xtv] fallo inyectando scripts:', err.message);
   });
@@ -96,7 +96,10 @@ function createWindow() {
   ses.setUserAgent(CHROME_UA);
 
   win = new BrowserWindow({
-    width: 760,
+    // ≥1000px: x.com usa el layout de escritorio completo (con el sidebar
+    // derecho) igual que en un navegador normal; por debajo colapsa a un
+    // layout angosto que puede alterar el feed.
+    width: 1100,
     height: 1000,
     title: 'XTV',
     titleBarStyle: 'hiddenInset',

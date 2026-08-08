@@ -42,7 +42,14 @@
     currentId: null,
     startedAt: 0,
     advancing: false,
+    hunting: false,
+    huntCount: 0,
+    lastAction: 'init',
   };
+
+  // Tope de bajadas consecutivas sin encontrar video, para no scrollear al
+  // infinito si la sección no tiene videos.
+  var MAX_HUNT = 40;
 
   /* ---- inventario ---- */
 
@@ -139,14 +146,21 @@
   }
 
   function evaluate() {
-    if (state.paused) {
+    if (state.paused || state.advancing) {
       return;
     }
     sweep();
     var video = activeVideo();
     if (!video) {
+      // El feed "Para ti" es mayormente texto/fotos: si no hay video visible,
+      // bajar hasta encontrar uno (convierte el timeline mixto en un feed de
+      // video). Con tope para no scrollear al infinito.
+      huntForVideo();
       return;
     }
+    // encontrado: fin del modo caza
+    state.hunting = false;
+    state.huntCount = 0;
     var article = articleOf(video);
     if (!article) {
       return;
@@ -160,6 +174,7 @@
       state.currentId = id;
       state.startedAt = Date.now();
       state.advancing = false;
+      state.lastAction = 'play ' + id;
     }
     // reproducir el activo, pausar el resto
     var vids = S.queryAll(document, 'video');
@@ -172,6 +187,25 @@
         vids[i].pause();
       }
     }
+  }
+
+  // Baja ~85% del viewport buscando el siguiente video; reprograma evaluate.
+  function huntForVideo() {
+    if (state.paused || state.advancing) {
+      return;
+    }
+    if (state.huntCount >= MAX_HUNT) {
+      state.lastAction = 'sin videos tras ' + MAX_HUNT + ' bajadas';
+      return; // agotado: probablemente no hay más videos por ahora
+    }
+    state.hunting = true;
+    state.huntCount++;
+    state.lastAction = 'buscando video (' + state.huntCount + ')';
+    var vh = window.innerHeight || document.documentElement.clientHeight;
+    window.scrollBy({ top: Math.round(vh * 0.85), left: 0, behavior: 'smooth' });
+    // tras el scroll, el MutationObserver/scroll disparan evaluate; añadimos un
+    // reintento explícito por si no llega contenido nuevo
+    setTimeout(scheduleEvaluate, 700);
   }
 
   /* ---- decisión y avance ---- */
@@ -296,6 +330,20 @@
     }
   }, 10000);
 
+  // Tick de "asegurar reproducción": si no hay video activo, seguir cazando
+  // (re-arma el tope para reintentar cuando el feed haya cargado más).
+  setInterval(function () {
+    if (state.paused || state.advancing) {
+      return;
+    }
+    if (!activeVideo()) {
+      if (state.huntCount >= MAX_HUNT) {
+        state.huntCount = 0; // reintentar: pudo cargar más contenido
+      }
+      huntForVideo();
+    }
+  }, 3000);
+
   /* ---- API pública (preload / tests) ---- */
 
   window.__xtv = {
@@ -313,10 +361,20 @@
       evaluate();
     },
     status: function () {
+      var arts = articles();
+      var vids = S.queryAll(document, 'video');
+      var active = activeVideo();
       return {
         paused: state.paused,
         currentId: state.currentId,
         advancing: state.advancing,
+        hunting: state.hunting,
+        huntCount: state.huntCount,
+        lastAction: state.lastAction,
+        articles: arts.length,
+        videos: vids.length,
+        activeVideo: !!active,
+        activePlaying: active ? !active.paused : false,
       };
     },
     _internals: {
